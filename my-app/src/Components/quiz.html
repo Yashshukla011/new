@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Easy Multiplayer Quiz</title>
+    <script src="https://www.gstatic.com/firebasejs/9.1.3/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.1.3/firebase-database-compat.js"></script>
+    <style>
+        body { font-family: sans-serif; text-align: center; background: #121212; color: white; padding: 50px; }
+        .card { background: #1e1e1e; padding: 30px; border-radius: 15px; display: inline-block; width: 380px; border: 1px solid #333; }
+        .hidden { display: none; }
+        .status { color: #00d4ff; font-weight: bold; margin-bottom: 20px; border: 1px solid #444; padding: 10px; border-radius: 8px; }
+        button { width: 100%; padding: 12px; margin: 8px 0; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; background: #444; color: white; }
+        button:disabled { background: #222; color: #666; cursor: not-allowed; }
+        button:hover:not(:disabled) { background: #007bff; }
+        #winner-msg { font-size: 24px; color: #4caf50; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <div id="status" class="status">Initializing...</div>
+
+    <div id="wait-screen">
+        <h2>⏳ Waiting Room</h2>
+        <p>Dusre player ka intezar karein...</p>
+    </div>
+
+    <div id="quiz-screen" class="hidden">
+        <h3 id="question-text">Question?</h3>
+        <div id="options-box"></div>
+    </div>
+
+    <div id="end-screen" class="hidden">
+        <h2 id="winner-msg"></h2>
+        <div id="final-scores"></div>
+        <button onclick="location.reload()" style="background: #007bff; margin-top:20px;">Play Again</button>
+    </div>
+</div>
+
+<script>
+  
+    const firebaseConfig = {
+        databaseURL: "https://testing-quiz-default-rtdb.firebaseio.com/" 
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database().ref("game_room_1");
+
+    
+    let myId = "player_" + Math.floor(Math.random() * 1000);
+    let gameState = {};
+
+    const questions = [
+        { q: "Computer Brain?", options: ["CPU", "RAM"], correct: 0 },
+        { q: "Capital of India?", options: ["Delhi", "Mumbai"], correct: 0 },
+        { q: "JS stands for?", options: ["JavaSheet", "JavaScript"], correct: 1 }
+    ];
+
+    
+
+    db.child("players").child(myId).set({ score: 0, name: myId });
+
+ 
+    db.on('value', (snapshot) => {
+        const data = snapshot.val() || {};
+        const players = data.players ? Object.keys(data.players) : [];
+        const currentIndex = data.currentQuestion || 0;
+
+        
+        if (players.length < 2) {
+            showScreen('wait-screen');
+            document.getElementById('status').innerText = "Waiting for Player 2...";
+            return;
+        }
+
+      
+        if (currentIndex >= questions.length) {
+            showScreen('end-screen');
+            document.getElementById('status').innerText = "Finished!";
+            showWinner(data.players);
+            return;
+        }
+
+        showScreen('quiz-screen');
+        const q = questions[currentIndex];
+        document.getElementById('question-text').innerText = q.q;
+        
+       
+        const turnId = players[currentIndex % 2]; 
+        const isMyTurn = (myId === turnId);
+        
+        document.getElementById('status').innerText = isMyTurn ? "YOUR TURN! ✅" : "WAITING FOR OPPONENT... ⏳";
+
+        const optBox = document.getElementById('options-box');
+        optBox.innerHTML = '';
+        q.options.forEach((opt, i) => {
+            const btn = document.createElement('button');
+            btn.innerText = opt;
+            btn.disabled = !isMyTurn;
+            btn.onclick = () => {
+                if (i === q.correct) {
+                    db.child("players").child(myId).child("score").transaction(s => (s || 0) + 10);
+                }
+                db.update({ currentQuestion: currentIndex + 1 });
+            };
+            optBox.appendChild(btn);
+        });
+    });
+
+    function showScreen(id) {
+        ['wait-screen', 'quiz-screen', 'end-screen'].forEach(s => document.getElementById(s).classList.add('hidden'));
+        document.getElementById(id).classList.remove('hidden');
+    }
+
+    function showWinner(players) {
+        let scores = Object.values(players);
+        let msg = "";
+        if (scores[0].score > scores[1].score) msg = scores[0].name + " Won! 🏆";
+        else if (scores[1].score > scores[0].score) msg = scores[1].name + " Won! 🏆";
+        else msg = "It's a Tie! 🤝";
+        
+        document.getElementById('winner-msg').innerText = msg;
+        document.getElementById('final-scores').innerHTML = scores.map(p => `<p>${p.name}: ${p.score} pts</p>`).join('');
+    }
+
+    // Cleanup on close
+    window.onbeforeunload = () => { db.child("players").child(myId).remove(); };
+</script>
+</body>
+</html>
