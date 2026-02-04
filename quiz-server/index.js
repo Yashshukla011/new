@@ -6,10 +6,8 @@ const axios = require('axios');
 
 const app = express();
 
-// CORS ko open rakha hai taaki Vercel se connection ho sake
 app.use(cors());
 
-// Render check ke liye ek basic route
 app.get('/', (req, res) => {
   res.send('Quiz Backend is Running!');
 });
@@ -18,7 +16,7 @@ const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
-    origin: "*", // Production mein aap yahan apna Vercel URL daal sakte hain
+    origin: "*", 
     methods: ["GET", "POST"]
   }
 });
@@ -110,6 +108,5 @@ io.on("connection", (socket) => {
     });
 });
 
-// Render dynamic port use karta hai, isliye process.env.PORT zaroori hai
 const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
