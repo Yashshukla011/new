@@ -6,9 +6,9 @@ const axios = require('axios');
 
 const app = express();
 
-// 1. CORS Middleware (Production ke liye "*" sabse safe hai agar links change ho rahe ho)
+// 1. CORS Middleware update kiya (Production ke liye)
 app.use(cors({
-    origin: "*", 
+    origin: ["https://new-jsz523dyf-yashshukla011s-projects.vercel.app", "https://new-bice-one-83.vercel.app"],
     methods: ["GET", "POST"],
     credentials: true
 }));
@@ -19,14 +19,13 @@ app.get('/', (req, res) => {
 
 const server = http.createServer(app);
 
-// 2. Socket.io Configuration (Transports order is critical for Railway)
 const io = new Server(server, {
   cors: {
-    origin: "*",
+    // Yahan '*' bhi chalega par specific domain zyada safe hai
+    origin: "*", 
     methods: ["GET", "POST"],
     credentials: true
-  },
-  transports: ['polling', 'websocket'] // 'polling' first for stability
+  }
 });
 
 let rooms = {}; 
@@ -36,7 +35,6 @@ io.on("connection", (socket) => {
 
     socket.on("join_room", ({ roomId, userName, userId, maxPlayers }) => {
         if (!roomId || !userName) return;
-        
         socket.join(roomId);
         
         if (!rooms[roomId]) {
@@ -45,42 +43,37 @@ io.on("connection", (socket) => {
                 questions: [], 
                 currentStep: 0, 
                 answersReceived: 0,
-                maxPlayers: parseInt(maxPlayers) || 2,
+                maxPlayers: maxPlayers || 2,
                 gameStarted: false
             };
         }
         
         const room = rooms[roomId];
+        if (room.gameStarted) {
+            socket.emit("receive_message", { sender: "System", text: "Game already in progress.", time: "" });
+            return;
+        }
 
-        // Check if player already exists (Handle Reconnect)
-        const existingPlayer = room.players.find(p => p.userId === userId);
-        
-        if (existingPlayer) {
-            existingPlayer.socketId = socket.id; // Update socket ID on reconnect
-        } else {
-            if (room.players.length >= room.maxPlayers) {
-                socket.emit("room_full");
-                return;
-            }
-            if (room.gameStarted) {
-                socket.emit("receive_message", { sender: "System", text: "Game already in progress.", time: "" });
-                return;
-            }
-            
+        const isAlreadyIn = room.players.find(p => p.userId === userId || p.socketId === socket.id);
+        if (room.players.length >= room.maxPlayers && !isAlreadyIn) {
+            socket.emit("room_full");
+            return;
+        }
+
+        if (!isAlreadyIn) {
             room.players.push({ 
                 userId, 
                 name: userName, 
                 socketId: socket.id, 
                 score: 0 
             });
-
+            
             io.to(roomId).emit("receive_message", {
                 sender: "System",
                 text: `${userName} joined the battle!`,
                 time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
             });
         }
-        
         io.to(roomId).emit("update_players", { players: room.players, maxPlayers: room.maxPlayers });
     });
 
@@ -97,9 +90,9 @@ io.on("connection", (socket) => {
         if (!room || room.gameStarted) return;
 
         try {
-            const res = await axios.get('https://opentdb.com/api.php?amount=5&type=multiple&difficulty=medium', { timeout: 8000 });
+            const res = await axios.get('https://opentdb.com/api.php?amount=5&type=multiple&difficulty=medium', { timeout: 5000 });
             
-            if (res.data.results && res.data.results.length > 0) {
+            if (res.data.results) {
                 const formatted = res.data.results.map((q, i) => {
                     const opts = [...q.incorrect_answers, q.correct_answer].sort(() => Math.random() - 0.5);
                     return { id: i, q: q.question, options: opts, ans: q.correct_answer };
@@ -117,8 +110,8 @@ io.on("connection", (socket) => {
                 });
             }
         } catch (e) { 
-            console.error("API Error:", e.message);
-            io.to(roomId).emit("receive_message", { sender: "System", text: "Questions load nahi ho paye. Try again.", time: "" });
+            console.error("Error fetching questions:", e.message);
+            io.to(roomId).emit("receive_message", { sender: "System", text: "Failed to load questions. Try again.", time: "" });
         }
     });
 
@@ -126,7 +119,7 @@ io.on("connection", (socket) => {
         const room = rooms[roomId];
         if (!room || !room.gameStarted) return;
         
-        const p = room.players.find(x => x.userId === userId);
+        const p = room.players.find(x => x.userId === userId || x.socketId === socket.id);
         if (p) { p.score += points; }
 
         room.answersReceived++;
@@ -142,7 +135,7 @@ io.on("connection", (socket) => {
                         index: room.currentStep, 
                         total: room.questions.length 
                     });
-                }, 2000);
+                }, 1000);
             } else {
                 io.to(roomId).emit("game_over", room.players);
                 room.gameStarted = false;
@@ -155,22 +148,15 @@ io.on("connection", (socket) => {
         for (const roomId in rooms) {
             const room = rooms[roomId];
             const playerIndex = room.players.findIndex(p => p.socketId === socket.id);
-            
             if (playerIndex !== -1) {
                 const playerName = room.players[playerIndex].name;
                 room.players.splice(playerIndex, 1);
-                
                 io.to(roomId).emit("update_players", { players: room.players, maxPlayers: room.maxPlayers });
-                io.to(roomId).emit("receive_message", { sender: "System", text: `${playerName} disconnected.`, time: "" });
-
-                if (room.players.length === 0) { 
-                    delete rooms[roomId]; 
-                }
+                if (room.players.length === 0) { delete rooms[roomId]; }
             }
         }
-        console.log(`User Disconnected: ${socket.id}`);
     });
 });
 
-const PORT = process.env.PORT || 3004; 
+const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
