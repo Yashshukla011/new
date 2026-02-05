@@ -1,7 +1,12 @@
 import { io } from "socket.io-client";
 
-// Railway dashboard se jo "Public Domain" mila hai wo yahan dalein
-const socket = io("https://perpetual-consideration-production.up.railway.app", {
-    transports: ["websocket", "polling"],
-    withCredentials: true
+// IMPORTANT: Yahan apna real backend link hi dalna
+const SOCKET_URL = "new-production-132c.up.railway.app"; 
+
+const socket = io(SOCKET_URL, {
+  transports: ['websocket', 'polling'], 
+  withCredentials: true,
+  autoConnect: false // Iska matlab hai socket tabhi start hoga jab hum bolenge
 });
+
+export default socket;
