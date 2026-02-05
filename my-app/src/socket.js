@@ -1,12 +1,14 @@
 import { io } from "socket.io-client";
 
-// Environment variable use karein, agar nahi mile toh localhost fallback
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || "http://localhost:3001"; 
+// Local test kar rahe ho to localhost chalega, deploy karoge to Railway URL
+const SOCKET_URL = window.location.hostname === "localhost" 
+    ? "http://localhost:3001" 
+    : "https://new-production-132c.up.railway.app"; 
 
 const socket = io(SOCKET_URL, {
-  transports: ['websocket', 'polling'], // websocket ko priority dein
+  transports: ['websocket', 'polling'], 
   withCredentials: true,
-  autoConnect: false 
+  autoConnect: true // Ise true kar diya taaki click pe wait na karna pade
 });
 
 export default socket;

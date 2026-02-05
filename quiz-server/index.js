@@ -1,16 +1,18 @@
-import express from 'express';
-import http from 'http';
-import { Server } from 'socket.io';
-import cors from 'cors';
-import axios from 'axios';
-import he from 'he'; // HTML entities decode karne ke liye
+const express = require('express');
+const http = require('http');
+const { Server } = require('socket.io');
+const cors = require('cors');
+const axios = require('axios');
+const he = require('he'); // Install: npm install he
 
 const app = express();
+const server = http.createServer(app);
 
+// CORS configuration
 const allowedOrigins = [
     "https://new-jsz523dyf-yashshukla011s-projects.vercel.app", 
     "https://new-bice-one-83.vercel.app",
-    "http://localhost:5173"
+    "http://localhost:5173" // Local testing ke liye
 ];
 
 app.use(cors({
@@ -19,15 +21,9 @@ app.use(cors({
     credentials: true
 }));
 
-app.get('/', (req, res) => {
-  res.send('Quiz Backend is Running!');
-});
-
-const server = http.createServer(app);
-
 const io = new Server(server, {
   cors: {
-    origin: ["http://localhost:5173", "https://your-vercel-link.app"], // Dono allow karein
+    origin: allowedOrigins,
     methods: ["GET", "POST"],
     credentials: true
   }
@@ -97,7 +93,7 @@ io.on("connection", (socket) => {
                 });
             }
         } catch (e) {
-            console.error("Fetch Error:", e.message);
+            console.error("API Error:", e.message);
         }
     });
 
