@@ -6,13 +6,9 @@ const axios = require('axios');
 
 const app = express();
 
-// 1. CORS Middleware update (Saare frontend domains ko allow karein)
+// 1. CORS Middleware (Production ke liye "*" sabse safe hai agar links change ho rahe ho)
 app.use(cors({
-    origin: [
-        "https://new-jsz523dyf-yashshukla011s-projects.vercel.app", 
-        "https://new-bice-one-83.vercel.app",
-        "http://localhost:5173" // Local testing ke liye
-    ],
+    origin: "*", 
     methods: ["GET", "POST"],
     credentials: true
 }));
@@ -23,14 +19,14 @@ app.get('/', (req, res) => {
 
 const server = http.createServer(app);
 
-// 2. Socket.io CORS config (Frontend ke saath match honi chahiye)
+// 2. Socket.io Configuration (Transports order is critical for Railway)
 const io = new Server(server, {
   cors: {
-    origin: "*", // Production mein '*' handle karna easy hai agar multiple Vercel links hon
+    origin: "*",
     methods: ["GET", "POST"],
     credentials: true
   },
-  transports: ['websocket', 'polling'] // Railway/Render ke liye polling backup zaroori hai
+  transports: ['polling', 'websocket'] // 'polling' first for stability
 });
 
 let rooms = {}; 
@@ -40,6 +36,7 @@ io.on("connection", (socket) => {
 
     socket.on("join_room", ({ roomId, userName, userId, maxPlayers }) => {
         if (!roomId || !userName) return;
+        
         socket.join(roomId);
         
         if (!rooms[roomId]) {
@@ -48,39 +45,40 @@ io.on("connection", (socket) => {
                 questions: [], 
                 currentStep: 0, 
                 answersReceived: 0,
-                maxPlayers: maxPlayers || 2,
+                maxPlayers: parseInt(maxPlayers) || 2,
                 gameStarted: false
             };
         }
         
         const room = rooms[roomId];
-        if (room.gameStarted) {
-            socket.emit("receive_message", { sender: "System", text: "Game already in progress.", time: "" });
-            return;
-        }
 
-        const isAlreadyIn = room.players.find(p => p.userId === userId);
-        if (room.players.length >= room.maxPlayers && !isAlreadyIn) {
-            socket.emit("room_full");
-            return;
-        }
-
-        if (!isAlreadyIn) {
+        // Check if player already exists (Handle Reconnect)
+        const existingPlayer = room.players.find(p => p.userId === userId);
+        
+        if (existingPlayer) {
+            existingPlayer.socketId = socket.id; // Update socket ID on reconnect
+        } else {
+            if (room.players.length >= room.maxPlayers) {
+                socket.emit("room_full");
+                return;
+            }
+            if (room.gameStarted) {
+                socket.emit("receive_message", { sender: "System", text: "Game already in progress.", time: "" });
+                return;
+            }
+            
             room.players.push({ 
                 userId, 
                 name: userName, 
                 socketId: socket.id, 
                 score: 0 
             });
-            
+
             io.to(roomId).emit("receive_message", {
                 sender: "System",
                 text: `${userName} joined the battle!`,
                 time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
             });
-        } else {
-            // Agar user refresh karke wapas aaye, toh socket id update karein
-            isAlreadyIn.socketId = socket.id;
         }
         
         io.to(roomId).emit("update_players", { players: room.players, maxPlayers: room.maxPlayers });
@@ -99,7 +97,6 @@ io.on("connection", (socket) => {
         if (!room || room.gameStarted) return;
 
         try {
-            // API call timeout handle kiya
             const res = await axios.get('https://opentdb.com/api.php?amount=5&type=multiple&difficulty=medium', { timeout: 8000 });
             
             if (res.data.results && res.data.results.length > 0) {
@@ -120,8 +117,8 @@ io.on("connection", (socket) => {
                 });
             }
         } catch (e) { 
-            console.error("Error fetching questions:", e.message);
-            io.to(roomId).emit("receive_message", { sender: "System", text: "Failed to load questions. Check API.", time: "" });
+            console.error("API Error:", e.message);
+            io.to(roomId).emit("receive_message", { sender: "System", text: "Questions load nahi ho paye. Try again.", time: "" });
         }
     });
 
@@ -134,7 +131,6 @@ io.on("connection", (socket) => {
 
         room.answersReceived++;
 
-        // Jab saare players answer de dein tab hi next question bhejien
         if (room.answersReceived >= room.players.length) {
             room.currentStep++;
             room.answersReceived = 0;
@@ -146,11 +142,10 @@ io.on("connection", (socket) => {
                         index: room.currentStep, 
                         total: room.questions.length 
                     });
-                }, 2000); // 2 second delay better experience ke liye
+                }, 2000);
             } else {
                 io.to(roomId).emit("game_over", room.players);
                 room.gameStarted = false;
-                // Game over ke baad room ko clean up karne ki sochi ja sakti hai
             }
         }
         io.to(roomId).emit("update_players", { players: room.players, maxPlayers: room.maxPlayers });
@@ -160,24 +155,22 @@ io.on("connection", (socket) => {
         for (const roomId in rooms) {
             const room = rooms[roomId];
             const playerIndex = room.players.findIndex(p => p.socketId === socket.id);
+            
             if (playerIndex !== -1) {
                 const playerName = room.players[playerIndex].name;
                 room.players.splice(playerIndex, 1);
-                io.to(roomId).emit("update_players", { players: room.players, maxPlayers: room.maxPlayers });
                 
-                // Agar room khali ho jaye toh delete karein
+                io.to(roomId).emit("update_players", { players: room.players, maxPlayers: room.maxPlayers });
+                io.to(roomId).emit("receive_message", { sender: "System", text: `${playerName} disconnected.`, time: "" });
+
                 if (room.players.length === 0) { 
                     delete rooms[roomId]; 
-                } else if (room.gameStarted && room.players.length < 2) {
-                    // Agar game ke bich koi chor de aur 1 hi bacha ho
-                    io.to(roomId).emit("receive_message", { sender: "System", text: `${playerName} left. Game cannot continue.`, time: "" });
-                    // room.gameStarted = false; // Option to stop game
                 }
             }
         }
+        console.log(`User Disconnected: ${socket.id}`);
     });
 });
 
-// Railway/Heroku ke liye PORT setup
 const PORT = process.env.PORT || 3004; 
 server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
