@@ -27,7 +27,7 @@ const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
-    origin: allowedOrigins,
+    origin: ["http://localhost:5173", "https://your-vercel-link.app"], // Dono allow karein
     methods: ["GET", "POST"],
     credentials: true
   }
@@ -143,5 +143,5 @@ io.on("connection", (socket) => {
     });
 });
 
-const PORT = process.env.PORT || 3004;
+const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => console.log(`Server running on port ${PORT}`));

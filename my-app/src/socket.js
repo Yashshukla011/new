@@ -1,11 +1,10 @@
 import { io } from "socket.io-client";
 
-// Aapka current Railway URL
-const SOCKET_URL = "https://new-production-132c.up.railway.app"; 
+// Environment variable use karein, agar nahi mile toh localhost fallback
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || "http://localhost:3001"; 
 
 const socket = io(SOCKET_URL, {
-  // Backend se matching transports
-  transports: ['polling', 'websocket'], 
+  transports: ['websocket', 'polling'], // websocket ko priority dein
   withCredentials: true,
   autoConnect: false 
 });
