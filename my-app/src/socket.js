@@ -1,7 +1,9 @@
 import io from 'socket.io-client';
 
-const SOCKET_URL = "https://new-bice-one-83.vercel.app/"; 
+// Local testing ke liye aapka backend port 3001 hai
+const SOCKET_URL = "http://localhost:3001"; 
 
 export const socket = io(SOCKET_URL, {
-    transports: ['websocket'], 
+    transports: ['websocket', 'polling'], // Polling ko backup ke liye rakhein
+    withCredentials: true
 });
