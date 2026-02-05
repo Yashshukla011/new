@@ -8,9 +8,10 @@ const he = require('he');
 const app = express();
 const server = http.createServer(app);
 
+// Yahan aapke allowed URLs hain
 const allowedOrigins = [
+    "https://new-bice-one-83.vercel.app", // Aapka naya Vercel URL
     "https://new-jsz523dyf-yashshukla011s-projects.vercel.app", 
-    "https://new-bice-one-83.vercel.app",
     "http://localhost:5173"
 ];
 
@@ -28,7 +29,8 @@ const io = new Server(server, {
     methods: ["GET", "POST"],
     credentials: true
   },
-  allowEIO3: true
+  allowEIO3: true,
+  transports: ['websocket', 'polling'] // Connection stability ke liye
 });
 
 let rooms = {}; 
@@ -97,16 +99,22 @@ io.on("connection", (socket) => {
             } else {
                 io.to(roomId).emit("game_over", room.players);
                 room.gameStarted = false;
+                // Game khatam hone par room delete kar sakte hain memory bachane ke liye:
+                // delete rooms[roomId]; 
             }
         }
     });
 
     socket.on("disconnect", () => {
         for (const id in rooms) {
-            rooms[id].players = rooms[id].players.filter(p => p.socketId !== socket.id);
-            io.to(id).emit("update_players", { players: rooms[id].players, maxPlayers: rooms[id].maxPlayers });
+            if (rooms[id]) {
+                rooms[id].players = rooms[id].players.filter(p => p.socketId !== socket.id);
+                io.to(id).emit("update_players", { players: rooms[id].players, maxPlayers: rooms[id].maxPlayers });
+            }
         }
     });
 });
 
-server.listen(process.env.PORT || 3001, () => console.log("Server Running"));
+// Render dynamic port use karta hai
+const PORT = process.env.PORT || 3001;
+server.listen(PORT, () => console.log(`Server Running on port ${PORT}`));

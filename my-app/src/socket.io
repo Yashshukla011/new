@@ -1,18 +1,6 @@
 import { io } from "socket.io-client";
 
-const SOCKET_URL = window.location.hostname === "localhost" 
-    ? "http://localhost:3001" 
-    : "https://new-production-132c.up.railway.app"; 
-
-const socket = io(SOCKET_URL, {
-  transports: ['polling', 'websocket'], // Fallback mechanism
+const socket = io("https://new-1-vev3.onrender.com", {
   withCredentials: true,
-  autoConnect: true, 
-  reconnection: true,
-  reconnectionAttempts: 5
+  transports: ["websocket", "polling"]
 });
-
-socket.on("connect", () => console.log("Connected to Server! Socket ID:", socket.id));
-socket.on("connect_error", (err) => console.error("Socket Connection Error:", err.message));
-
-export default socket;
