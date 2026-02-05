@@ -8,10 +8,12 @@ const he = require('he');
 const app = express();
 const server = http.createServer(app);
 
+// Sabhi possible origins ko allow karein
 const allowedOrigins = [
     "https://new-jsz523dyf-yashshukla011s-projects.vercel.app", 
     "https://new-bice-one-83.vercel.app",
-    "http://localhost:5173"
+    "http://localhost:5173",
+    "http://127.0.0.1:5173"
 ];
 
 app.use(cors({
@@ -20,12 +22,17 @@ app.use(cors({
     credentials: true
 }));
 
+app.get('/', (req, res) => {
+    res.send('Quiz Server is Online ✅');
+});
+
 const io = new Server(server, {
-  cors: {
-    origin: allowedOrigins,
-    methods: ["GET", "POST"],
-    credentials: true
-  }
+    cors: {
+        origin: allowedOrigins,
+        methods: ["GET", "POST"],
+        credentials: true
+    },
+    allowEIO3: true // Compatibility ke liye
 });
 
 let rooms = {}; 
@@ -43,7 +50,7 @@ io.on("connection", (socket) => {
                 questions: [], 
                 currentStep: 0, 
                 answersReceived: 0,
-                maxPlayers: maxPlayers || 2,
+                maxPlayers: parseInt(maxPlayers) || 2,
                 gameStarted: false
             };
         }
@@ -65,7 +72,7 @@ io.on("connection", (socket) => {
         if (!room || room.gameStarted) return;
 
         try {
-            const res = await axios.get('https://opentdb.com/api.php?amount=5&type=multiple&difficulty=medium');
+            const res = await axios.get('https://opentdb.com/api.php?amount=5&type=multiple');
             if (res.data.results) {
                 room.questions = res.data.results.map((q, i) => ({
                     id: i,
@@ -87,7 +94,7 @@ io.on("connection", (socket) => {
                 });
             }
         } catch (e) {
-            console.error("Quiz Fetch Error");
+            console.error("API Error");
         }
     });
 
@@ -134,4 +141,6 @@ io.on("connection", (socket) => {
 });
 
 const PORT = process.env.PORT || 3001;
-server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+server.listen(PORT, () => {
+    console.log(`🚀 Server running on http://localhost:${PORT}`);
+});
