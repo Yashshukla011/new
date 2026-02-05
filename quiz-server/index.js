@@ -3,16 +3,15 @@ const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
 const axios = require('axios');
-const he = require('he'); // Install: npm install he
+const he = require('he'); 
 
 const app = express();
 const server = http.createServer(app);
 
-// CORS configuration
 const allowedOrigins = [
     "https://new-jsz523dyf-yashshukla011s-projects.vercel.app", 
     "https://new-bice-one-83.vercel.app",
-    "http://localhost:5173" // Local testing ke liye
+    "http://localhost:5173"
 ];
 
 app.use(cors({
@@ -53,12 +52,7 @@ io.on("connection", (socket) => {
         const isAlreadyIn = room.players.find(p => p.userId === userId);
 
         if (!isAlreadyIn && room.players.length < room.maxPlayers) {
-            room.players.push({ 
-                userId, 
-                name: userName, 
-                socketId: socket.id, 
-                score: 0 
-            });
+            room.players.push({ userId, name: userName, socketId: socket.id, score: 0 });
         } else if (isAlreadyIn) {
             isAlreadyIn.socketId = socket.id;
         }
@@ -93,7 +87,7 @@ io.on("connection", (socket) => {
                 });
             }
         } catch (e) {
-            console.error("API Error:", e.message);
+            console.error("Quiz Fetch Error");
         }
     });
 
