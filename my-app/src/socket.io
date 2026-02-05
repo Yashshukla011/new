@@ -2,7 +2,7 @@ import { io } from "socket.io-client";
 
 const SOCKET_URL = window.location.hostname === "localhost" 
     ? "http://localhost:3001" 
-    : "https://new-1-vev3.onrender.com/"; 
+    : "https://new-production-132c.up.railway.app"; 
 
 const socket = io(SOCKET_URL, {
   transports: ['polling', 'websocket'], // Fallback mechanism
