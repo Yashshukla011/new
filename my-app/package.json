@@ -1,7 +1,7 @@
 {
-  "name": "my-quiz-frontend",
+  "name": "my-app",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -9,13 +9,16 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@tailwindcss/vite": "^4.1.18",
+    "axios": "^1.13.4",
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "firebase": "^12.8.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "socket.io": "^4.8.3",
     "socket.io-client": "^4.8.3",
-    "firebase": "^12.8.0",
-    "axios": "^1.13.4",
-    "tailwindcss": "^4.1.18",
-    "@tailwindcss/vite": "^4.1.18"
+    "tailwindcss": "^4.1.18"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^5.1.1",
