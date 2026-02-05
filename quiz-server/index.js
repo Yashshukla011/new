@@ -8,11 +8,10 @@ const he = require('he');
 const app = express();
 const server = http.createServer(app);
 
-// Yahan aapke live frontend ke URLs hone chahiye
 const allowedOrigins = [
     "https://new-bice-one-83.vercel.app", 
     "https://new-jsz523dyf-yashshukla011s-projects.vercel.app",
-    "http://localhost:5173" // Local testing ke liye
+    "http://localhost:5173"
 ];
 
 app.use(cors({
@@ -24,12 +23,12 @@ app.use(cors({
 app.get('/', (req, res) => res.send('Server is Live ✅'));
 
 const io = new Server(server, {
-  cors: {
-    origin: allowedOrigins,
-    methods: ["GET", "POST"],
-    credentials: true
-  },
-  transports: ['websocket', 'polling'] 
+    cors: {
+        origin: allowedOrigins,
+        methods: ["GET", "POST"],
+        credentials: true
+    },
+    transports: ['websocket', 'polling'] 
 });
 
 let rooms = {}; 
@@ -58,7 +57,7 @@ io.on("connection", (socket) => {
         if (!exists && room.players.length < room.maxPlayers) {
             room.players.push({ userId, name: userName, socketId: socket.id, score: 0 });
         } else if (exists) {
-            exists.socketId = socket.id;
+            exists.socketId = socket.id; // Update socket ID on reconnect
         }
 
         io.to(roomId).emit("update_players", { players: room.players, maxPlayers: room.maxPlayers });
@@ -77,27 +76,43 @@ io.on("connection", (socket) => {
                 ans: he.decode(q.correct_answer)
             }));
             room.gameStarted = true;
+            room.currentStep = 0;
+            room.answersReceived = 0;
+            
             io.to(roomId).emit("next_question", { question: room.questions[0], index: 0, total: 5 });
         } catch (e) {
-            console.error("API Error");
+            console.error("API Error:", e);
         }
     });
 
     socket.on("submit_answer", ({ roomId, userId, points }) => {
         const room = rooms[roomId];
         if (!room) return;
+
         const p = room.players.find(x => x.userId === userId);
-        if (p) p.score += points;
+        if (p) {
+            p.score += points;
+        }
+
         room.answersReceived++;
+
+        // --- FIX: Har answer ke baad updated scores bhejna zaroori hai ---
+        io.to(roomId).emit("update_players", { players: room.players, maxPlayers: room.maxPlayers });
 
         if (room.answersReceived >= room.players.length) {
             room.currentStep++;
             room.answersReceived = 0;
+
             if (room.currentStep < room.questions.length) {
-                io.to(roomId).emit("next_question", { question: room.questions[room.currentStep], index: room.currentStep, total: 5 });
+                io.to(roomId).emit("next_question", { 
+                    question: room.questions[room.currentStep], 
+                    index: room.currentStep, 
+                    total: 5 
+                });
             } else {
                 io.to(roomId).emit("game_over", room.players);
                 room.gameStarted = false;
+                // Game khatam hone par score reset nahi kiya hai taaki result dikhe
             }
         }
     });
@@ -109,9 +124,19 @@ io.on("connection", (socket) => {
     });
 
     socket.on("disconnect", () => {
-        for (const id in rooms) {
-            rooms[id].players = rooms[id].players.filter(p => p.socketId !== socket.id);
-            io.to(id).emit("update_players", { players: rooms[id].players, maxPlayers: rooms[id].maxPlayers });
+        for (const roomId in rooms) {
+            const room = rooms[roomId];
+            const playerIndex = room.players.findIndex(p => p.socketId === socket.id);
+            
+            if (playerIndex !== -1) {
+                room.players.splice(playerIndex, 1);
+                
+                if (room.players.length === 0) {
+                    delete rooms[roomId]; // Room delete agar koi nahi bacha
+                } else {
+                    io.to(roomId).emit("update_players", { players: room.players, maxPlayers: room.maxPlayers });
+                }
+            }
         }
     });
 });
