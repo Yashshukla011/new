@@ -3,17 +3,15 @@ const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
 const axios = require('axios');
-const he = require('he'); 
+const he = require('he');
 
 const app = express();
 const server = http.createServer(app);
 
-// Sabhi possible origins ko allow karein
 const allowedOrigins = [
     "https://new-jsz523dyf-yashshukla011s-projects.vercel.app", 
     "https://new-bice-one-83.vercel.app",
-    "http://localhost:5173",
-    "http://127.0.0.1:5173"
+    "http://localhost:5173"
 ];
 
 app.use(cors({
@@ -22,23 +20,21 @@ app.use(cors({
     credentials: true
 }));
 
-app.get('/', (req, res) => {
-    res.send('Quiz Server is Online ✅');
-});
+app.get('/', (req, res) => res.send('Server is Live ✅'));
 
 const io = new Server(server, {
-    cors: {
-        origin: allowedOrigins,
-        methods: ["GET", "POST"],
-        credentials: true
-    },
-    allowEIO3: true // Compatibility ke liye
+  cors: {
+    origin: allowedOrigins,
+    methods: ["GET", "POST"],
+    credentials: true
+  },
+  allowEIO3: true
 });
 
 let rooms = {}; 
 
 io.on("connection", (socket) => {
-    console.log(`User Connected: ${socket.id}`);
+    console.log(`Connected: ${socket.id}`);
 
     socket.on("join_room", ({ roomId, userName, userId, maxPlayers }) => {
         if (!roomId || !userName) return;
@@ -56,12 +52,12 @@ io.on("connection", (socket) => {
         }
         
         const room = rooms[roomId];
-        const isAlreadyIn = room.players.find(p => p.userId === userId);
+        const exists = room.players.find(p => p.userId === userId);
 
-        if (!isAlreadyIn && room.players.length < room.maxPlayers) {
+        if (!exists && room.players.length < room.maxPlayers) {
             room.players.push({ userId, name: userName, socketId: socket.id, score: 0 });
-        } else if (isAlreadyIn) {
-            isAlreadyIn.socketId = socket.id;
+        } else if (exists) {
+            exists.socketId = socket.id;
         }
 
         io.to(roomId).emit("update_players", { players: room.players, maxPlayers: room.maxPlayers });
@@ -73,26 +69,14 @@ io.on("connection", (socket) => {
 
         try {
             const res = await axios.get('https://opentdb.com/api.php?amount=5&type=multiple');
-            if (res.data.results) {
-                room.questions = res.data.results.map((q, i) => ({
-                    id: i,
-                    q: he.decode(q.question),
-                    options: [...q.incorrect_answers, q.correct_answer]
-                        .map(opt => he.decode(opt))
-                        .sort(() => Math.random() - 0.5),
-                    ans: he.decode(q.correct_answer)
-                }));
-
-                room.gameStarted = true;
-                room.currentStep = 0;
-                room.answersReceived = 0;
-
-                io.to(roomId).emit("next_question", { 
-                    question: room.questions[0], 
-                    index: 0, 
-                    total: room.questions.length 
-                });
-            }
+            room.questions = res.data.results.map((q, i) => ({
+                id: i,
+                q: he.decode(q.question),
+                options: [...q.incorrect_answers, q.correct_answer].map(o => he.decode(o)).sort(() => Math.random() - 0.5),
+                ans: he.decode(q.correct_answer)
+            }));
+            room.gameStarted = true;
+            io.to(roomId).emit("next_question", { question: room.questions[0], index: 0, total: 5 });
         } catch (e) {
             console.error("API Error");
         }
@@ -100,47 +84,29 @@ io.on("connection", (socket) => {
 
     socket.on("submit_answer", ({ roomId, userId, points }) => {
         const room = rooms[roomId];
-        if (!room || !room.gameStarted) return;
-        
+        if (!room) return;
         const p = room.players.find(x => x.userId === userId);
         if (p) p.score += points;
-
         room.answersReceived++;
 
         if (room.answersReceived >= room.players.length) {
             room.currentStep++;
             room.answersReceived = 0;
-
             if (room.currentStep < room.questions.length) {
-                setTimeout(() => {
-                    io.to(roomId).emit("next_question", { 
-                        question: room.questions[room.currentStep], 
-                        index: room.currentStep, 
-                        total: room.questions.length 
-                    });
-                }, 1000);
+                io.to(roomId).emit("next_question", { question: room.questions[room.currentStep], index: room.currentStep, total: 5 });
             } else {
                 io.to(roomId).emit("game_over", room.players);
                 room.gameStarted = false;
             }
         }
-        io.to(roomId).emit("update_players", { players: room.players, maxPlayers: room.maxPlayers });
     });
 
     socket.on("disconnect", () => {
-        for (const roomId in rooms) {
-            const room = rooms[roomId];
-            const pIdx = room.players.findIndex(p => p.socketId === socket.id);
-            if (pIdx !== -1) {
-                room.players.splice(pIdx, 1);
-                if (room.players.length === 0) delete rooms[roomId];
-                else io.to(roomId).emit("update_players", { players: room.players, maxPlayers: room.maxPlayers });
-            }
+        for (const id in rooms) {
+            rooms[id].players = rooms[id].players.filter(p => p.socketId !== socket.id);
+            io.to(id).emit("update_players", { players: rooms[id].players, maxPlayers: rooms[id].maxPlayers });
         }
     });
 });
 
-const PORT = process.env.PORT || 3001;
-server.listen(PORT, () => {
-    console.log(`🚀 Server running on http://localhost:${PORT}`);
-});
+server.listen(process.env.PORT || 3001, () => console.log("Server Running"));
