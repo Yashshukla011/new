@@ -1,14 +1,20 @@
-const express = require('express');
-const http = require('http');
-const { Server } = require('socket.io');
-const cors = require('cors');
-const axios = require('axios');
+import express from 'express';
+import http from 'http';
+import { Server } from 'socket.io';
+import cors from 'cors';
+import axios from 'axios';
+import he from 'he'; // HTML entities decode karne ke liye
 
 const app = express();
 
-// 1. CORS Middleware update kiya (Production ke liye)
+const allowedOrigins = [
+    "https://new-jsz523dyf-yashshukla011s-projects.vercel.app", 
+    "https://new-bice-one-83.vercel.app",
+    "http://localhost:5173" // Local testing ke liye
+];
+
 app.use(cors({
-    origin: ["https://new-jsz523dyf-yashshukla011s-projects.vercel.app", "https://new-bice-one-83.vercel.app"],
+    origin: allowedOrigins,
     methods: ["GET", "POST"],
     credentials: true
 }));
@@ -21,8 +27,7 @@ const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
-    // Yahan '*' bhi chalega par specific domain zyada safe hai
-    origin: "*", 
+    origin: allowedOrigins,
     methods: ["GET", "POST"],
     credentials: true
   }
@@ -54,7 +59,7 @@ io.on("connection", (socket) => {
             return;
         }
 
-        const isAlreadyIn = room.players.find(p => p.userId === userId || p.socketId === socket.id);
+        const isAlreadyIn = room.players.find(p => p.userId === userId);
         if (room.players.length >= room.maxPlayers && !isAlreadyIn) {
             socket.emit("room_full");
             return;
@@ -67,22 +72,12 @@ io.on("connection", (socket) => {
                 socketId: socket.id, 
                 score: 0 
             });
-            
-            io.to(roomId).emit("receive_message", {
-                sender: "System",
-                text: `${userName} joined the battle!`,
-                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-            });
+        } else {
+            // Agar player refresh kare toh socket ID update karein
+            isAlreadyIn.socketId = socket.id;
         }
-        io.to(roomId).emit("update_players", { players: room.players, maxPlayers: room.maxPlayers });
-    });
 
-    socket.on("send_message", (data) => {
-        io.to(data.roomId).emit("receive_message", {
-            sender: data.sender, 
-            text: data.text,
-            time: data.time
-        });
+        io.to(roomId).emit("update_players", { players: room.players, maxPlayers: room.maxPlayers });
     });
 
     socket.on("start_battle", async (roomId) => {
@@ -93,25 +88,32 @@ io.on("connection", (socket) => {
             const res = await axios.get('https://opentdb.com/api.php?amount=5&type=multiple&difficulty=medium', { timeout: 5000 });
             
             if (res.data.results) {
-                const formatted = res.data.results.map((q, i) => {
-                    const opts = [...q.incorrect_answers, q.correct_answer].sort(() => Math.random() - 0.5);
-                    return { id: i, q: q.question, options: opts, ans: q.correct_answer };
+                room.questions = res.data.results.map((q, i) => {
+                    // Decoding special characters like &quot;
+                    const options = [...q.incorrect_answers, q.correct_answer]
+                        .map(opt => he.decode(opt))
+                        .sort(() => Math.random() - 0.5);
+                    
+                    return { 
+                        id: i, 
+                        q: he.decode(q.question), 
+                        options, 
+                        ans: he.decode(q.correct_answer) 
+                    };
                 });
 
-                room.questions = formatted;
                 room.gameStarted = true;
                 room.currentStep = 0;
                 room.answersReceived = 0;
 
                 io.to(roomId).emit("next_question", { 
-                    question: formatted[0], 
+                    question: room.questions[0], 
                     index: 0, 
-                    total: formatted.length 
+                    total: room.questions.length 
                 });
             }
         } catch (e) { 
-            console.error("Error fetching questions:", e.message);
-            io.to(roomId).emit("receive_message", { sender: "System", text: "Failed to load questions. Try again.", time: "" });
+            io.to(roomId).emit("receive_message", { sender: "System", text: "Failed to load questions.", time: "" });
         }
     });
 
@@ -119,11 +121,12 @@ io.on("connection", (socket) => {
         const room = rooms[roomId];
         if (!room || !room.gameStarted) return;
         
-        const p = room.players.find(x => x.userId === userId || x.socketId === socket.id);
+        const p = room.players.find(x => x.userId === userId);
         if (p) { p.score += points; }
 
         room.answersReceived++;
 
+        // Logic check: Sabne answer diya ya nahi
         if (room.answersReceived >= room.players.length) {
             room.currentStep++;
             room.answersReceived = 0;
@@ -139,6 +142,7 @@ io.on("connection", (socket) => {
             } else {
                 io.to(roomId).emit("game_over", room.players);
                 room.gameStarted = false;
+                room.questions = []; // Clear memory
             }
         }
         io.to(roomId).emit("update_players", { players: room.players, maxPlayers: room.maxPlayers });
@@ -149,10 +153,17 @@ io.on("connection", (socket) => {
             const room = rooms[roomId];
             const playerIndex = room.players.findIndex(p => p.socketId === socket.id);
             if (playerIndex !== -1) {
-                const playerName = room.players[playerIndex].name;
                 room.players.splice(playerIndex, 1);
                 io.to(roomId).emit("update_players", { players: room.players, maxPlayers: room.maxPlayers });
-                if (room.players.length === 0) { delete rooms[roomId]; }
+                
+                // Room cleanup agar koi nahi bacha
+                if (room.players.length === 0) { 
+                    delete rooms[roomId]; 
+                } else if (room.gameStarted && room.answersReceived >= room.players.length) {
+                    // Agar game chal raha tha toh next question par move karein
+                    // (Kyuki player kam ho gaye hain)
+                    // ... same logic as submit_answer ...
+                }
             }
         }
     });
