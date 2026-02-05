@@ -1,8 +1,7 @@
-import io from 'socket.io-client';
-
-const SOCKET_URL = "http://localhost:3001"; 
-
-export const socket = io(SOCKET_URL, {
-    transports: ['websocket', 'polling'],
-    withCredentials: true
+// index.js (Backend)
+const io = new Server(server, {
+  cors: {
+    origin: "http://localhost:5173", // Frontend ka address
+    methods: ["GET", "POST"]
+  }
 });
