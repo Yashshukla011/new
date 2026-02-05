@@ -8,11 +8,11 @@ const he = require('he');
 const app = express();
 const server = http.createServer(app);
 
-// Yahan aapke allowed URLs hain
+// Yahan aapke live frontend ke URLs hone chahiye
 const allowedOrigins = [
-    "https://new-bice-one-83.vercel.app", // Aapka naya Vercel URL
-    "https://new-jsz523dyf-yashshukla011s-projects.vercel.app", 
-    "http://localhost:5173"
+    "https://new-bice-one-83.vercel.app", 
+    "https://new-jsz523dyf-yashshukla011s-projects.vercel.app",
+    "http://localhost:5173" // Local testing ke liye
 ];
 
 app.use(cors({
@@ -29,8 +29,7 @@ const io = new Server(server, {
     methods: ["GET", "POST"],
     credentials: true
   },
-  allowEIO3: true,
-  transports: ['websocket', 'polling'] // Connection stability ke liye
+  transports: ['websocket', 'polling'] 
 });
 
 let rooms = {}; 
@@ -99,22 +98,23 @@ io.on("connection", (socket) => {
             } else {
                 io.to(roomId).emit("game_over", room.players);
                 room.gameStarted = false;
-                // Game khatam hone par room delete kar sakte hain memory bachane ke liye:
-                // delete rooms[roomId]; 
             }
+        }
+    });
+
+    socket.on("send_message", (data) => {
+        if(data.roomId) {
+            io.to(data.roomId).emit("receive_message", data);
         }
     });
 
     socket.on("disconnect", () => {
         for (const id in rooms) {
-            if (rooms[id]) {
-                rooms[id].players = rooms[id].players.filter(p => p.socketId !== socket.id);
-                io.to(id).emit("update_players", { players: rooms[id].players, maxPlayers: rooms[id].maxPlayers });
-            }
+            rooms[id].players = rooms[id].players.filter(p => p.socketId !== socket.id);
+            io.to(id).emit("update_players", { players: rooms[id].players, maxPlayers: rooms[id].maxPlayers });
         }
     });
 });
 
-// Render dynamic port use karta hai
 const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => console.log(`Server Running on port ${PORT}`));

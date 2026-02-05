@@ -1,8 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { io } from "socket.io-client";
 
-const socket = io("http://localhost:3001");
+// YAHAN APNA RENDER URL DALIYE
+const socket = io("https://new-1-vev3.onrender.com", {
+    transports: ["websocket", "polling"],
+    withCredentials: true
+});
 
+// ... baaki poora MultiplePlayer component ka code waisa hi rahega ...
 const ChatBox = ({ isChatOpen, setIsChatOpen, messages, userName, roomId }) => {
   const [newMessage, setNewMessage] = useState("");
   const chatEndRef = useRef(null);
