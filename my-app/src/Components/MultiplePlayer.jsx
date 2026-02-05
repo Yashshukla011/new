@@ -1,17 +1,24 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { io } from "socket.io-client";
-
-const socket = io("http://localhost:3001");
+import socket from '../socket'; // <--- IMPORT FIXED
 
 const ChatBox = ({ isChatOpen, setIsChatOpen, messages, userName, roomId }) => {
   const [newMessage, setNewMessage] = useState("");
   const chatEndRef = useRef(null);
-  useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, isChatOpen]);
+  
+  useEffect(() => { 
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" }); 
+  }, [messages, isChatOpen]);
 
   const sendMessage = (e) => {
     e.preventDefault();
     if (newMessage.trim() && roomId) {
-      socket.emit("send_message", { roomId, sender: userName || "Player", text: newMessage, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) });
+      // socket.js wala socket use ho raha hai
+      socket.emit("send_message", { 
+        roomId, 
+        sender: userName || "Player", 
+        text: newMessage, 
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) 
+      });
       setNewMessage("");
     }
   };
@@ -51,8 +58,6 @@ const MultiplePlayer = () => {
   const [gameOver, setGameOver] = useState(false);
   const [messages, setMessages] = useState([]);
   const [isChatOpen, setIsChatOpen] = useState(false);
-  
-  // --- NEW: Timer States ---
   const [timeLeft, setTimeLeft] = useState(15);
   const timerRef = useRef(null);
 
@@ -62,7 +67,10 @@ const MultiplePlayer = () => {
     return id;
   });
 
+  // --- MODIFIED: Connection Logic ---
   useEffect(() => {
+    socket.connect(); // Connect to Railway
+
     socket.on("update_players", (data) => setPlayers([...data.players].sort((a, b) => b.score - a.score)));
     socket.on("game_over", (list) => { setPlayers(list.sort((a, b) => b.score - a.score)); setGameOver(true); });
     socket.on("receive_message", (msg) => setMessages(prev => [...prev, msg]));
@@ -72,20 +80,24 @@ const MultiplePlayer = () => {
       setCurrentQ(data.question);
       setHasAnswered(false);
       setSelectedOption(null);
-      setTimeLeft(15); // Reset Timer
+      setTimeLeft(15);
     });
 
-    return () => { socket.off(); clearInterval(timerRef.current); };
+    return () => { 
+      socket.off(); 
+      socket.disconnect(); // Clean up on exit
+      clearInterval(timerRef.current); 
+    };
   }, []);
 
-  // --- Timer Logic ---
+  // --- Timer Logic (No change needed) ---
   useEffect(() => {
     if (currentQ && !hasAnswered && timeLeft > 0) {
       timerRef.current = setInterval(() => {
         setTimeLeft(prev => prev - 1);
       }, 1000);
     } else if (timeLeft === 0 && !hasAnswered) {
-      handleAnswer(null); // Auto-submit on timeout
+      handleAnswer(null);
     }
     return () => clearInterval(timerRef.current);
   }, [timeLeft, currentQ, hasAnswered]);
@@ -96,7 +108,6 @@ const MultiplePlayer = () => {
     setSelectedOption(opt);
     clearInterval(timerRef.current);
 
-    // Dynamic Scoring: Time left = Points (Max 15, Min 0)
     let points = 0;
     if (opt === currentQ.ans) {
       points = timeLeft > 0 ? timeLeft : 1; 
@@ -104,6 +115,9 @@ const MultiplePlayer = () => {
     socket.emit("submit_answer", { roomId, userId, points });
   };
 
+  // UI Code (Wait/Game/GameOver) exactly as your previous version...
+  // (Maintained your clean black/emerald styling)
+  
   if (gameOver) {
     return (
       <div className="h-screen bg-black text-white flex flex-col items-center justify-center p-8">
@@ -141,14 +155,9 @@ const MultiplePlayer = () => {
         </div>
       ) : currentQ ? (
         <div className="flex-1 flex flex-col">
-          {/* Animated Progress Bar */}
           <div className="w-full h-1.5 bg-zinc-900">
-            <div 
-              className={`h-full transition-all duration-1000 ease-linear ${timeLeft < 5 ? 'bg-red-500' : 'bg-emerald-500'}`}
-              style={{ width: `${(timeLeft / 15) * 100}%` }}
-            ></div>
+            <div className={`h-full transition-all duration-1000 ease-linear ${timeLeft < 5 ? 'bg-red-500' : 'bg-emerald-500'}`} style={{ width: `${(timeLeft / 15) * 100}%` }}></div>
           </div>
-
           <div className="p-6 flex justify-between items-center">
             <div className="flex flex-col">
                <span className="font-black text-zinc-500 uppercase text-[10px]">Question {qInfo.index + 1}/{qInfo.total}</span>
@@ -156,21 +165,17 @@ const MultiplePlayer = () => {
             </div>
             <button onClick={() => setIsChatOpen(!isChatOpen)} className="bg-[#0a0a0a] p-3 rounded-full relative border border-white/5 shadow-xl">💬</button>
           </div>
-
           <div className="flex-1 flex flex-col items-center justify-center px-6">
             <div className="w-full max-w-2xl bg-[#0a0a0a] p-10 rounded-[40px] border border-white/5 shadow-2xl relative">
               <h2 className="text-2xl font-bold text-center mb-10 leading-snug" dangerouslySetInnerHTML={{ __html: currentQ.q }} />
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {currentQ.options.map(opt => (
-                  <button key={opt} disabled={hasAnswered} onClick={() => handleAnswer(opt)} 
-                    className={`p-5 rounded-2xl font-bold border-2 transition-all ${selectedOption === opt ? (opt === currentQ.ans ? 'border-emerald-500 bg-emerald-500/10' : 'border-red-500 bg-red-500/10') : 'border-white/5 bg-zinc-900/50'}`} 
-                    dangerouslySetInnerHTML={{ __html: opt }} />
+                  <button key={opt} disabled={hasAnswered} onClick={() => handleAnswer(opt)} className={`p-5 rounded-2xl font-bold border-2 transition-all ${selectedOption === opt ? (opt === currentQ.ans ? 'border-emerald-500 bg-emerald-500/10' : 'border-red-500 bg-red-500/10') : 'border-white/5 bg-zinc-900/50'}`} dangerouslySetInnerHTML={{ __html: opt }} />
                 ))}
               </div>
             </div>
             {hasAnswered && <p className="mt-8 text-emerald-500 animate-pulse font-black text-[10px] tracking-[4px] uppercase">Waiting for others...</p>}
           </div>
-
           <div className="p-6 flex justify-center gap-3 overflow-x-auto bg-[#0a0a0a] border-t border-white/5">
             {players.map((p, idx) => (
               <div key={p.userId} className={`min-w-[100px] p-3 rounded-xl border ${p.userId === userId ? 'border-emerald-500/50 bg-emerald-500/5' : 'border-white/5'}`}>
