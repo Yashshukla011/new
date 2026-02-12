@@ -1,101 +1,132 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Sun, Moon, Swords, Target, Globe, Zap, Trophy, Activity, Crown } from 'lucide-react';
 
-const StartScreen = ({ onStartPvP, onStartSolo, onStartMultiple }) => {
+const StartScreen = ({ onStartPvP, onStartSolo, onStartMultiple,onStartMultipl }) => {
+  const [isDark, setIsDark] = useState(true);
+
+  const theme = {
+    bg: isDark ? 'bg-[#050505]' : 'bg-[#F0F2F5]',
+    cardBg: isDark ? 'bg-[#0d0d0d]' : 'bg-white',
+    textMain: isDark ? 'text-white' : 'text-[#1A1A1A]',
+    textSub: isDark ? 'text-zinc-500' : 'text-zinc-400',
+    border: isDark ? 'border-white/5' : 'border-zinc-200',
+    glow: isDark ? 'bg-emerald-500/10' : 'bg-emerald-500/20',
+  };
+
   return (
-    <div className="min-h-screen w-full bg-[#050505] text-white font-sans flex flex-col items-center py-12 px-6 overflow-y-auto custom-scrollbar">
+    <div className={`min-h-screen w-full ${theme.bg} ${theme.textMain} font-sans flex flex-col items-center py-12 px-6 transition-all duration-500 overflow-y-auto relative`}>
       
+      {/* --- Theme Toggle --- */}
+      <button 
+        onClick={() => setIsDark(!isDark)}
+        className={`fixed top-6 right-6 p-3 rounded-2xl border ${theme.border} ${theme.cardBg} shadow-2xl z-50 hover:scale-110 transition-all`}
+      >
+        {isDark ? <Sun size={20} className="text-yellow-400" /> : <Moon size={20} className="text-indigo-600" />}
+      </button>
+
       {/* --- Header Section --- */}
-      <div className="text-center mb-20 flex-none relative">
-        {/* Soft Background Glow */}
-        <div className="absolute -top-20 left-1/2 -translate-x-1/2 w-64 h-64 bg-emerald-500/10 blur-[100px]"></div>
-        
-        <h1 className="text-7xl md:text-9xl font-black tracking-tighter text-white italic">
+      <header className="text-center mb-12 relative">
+        <div className={`absolute -top-10 left-1/2 -translate-x-1/2 w-64 h-64 ${theme.glow} blur-[100px] rounded-full opacity-50`}></div>
+        <h1 className="text-6xl md:text-8xl font-black tracking-tighter italic relative leading-none">
           Imagin<span className="text-emerald-500">XP</span>
         </h1>
-        <p className="text-sm tracking-[0.8em] text-zinc-500 mt-4 uppercase font-bold">
-          Ultimate Quiz Battle Arena
+        <p className={`text-[10px] tracking-[0.6em] ${theme.textSub} mt-4 uppercase font-black relative`}>
+          Next-Gen Battle Interface
         </p>
+      </header>
+
+      {/* --- Game Modes Grid (Now 4 Columns on Desktop) --- */}
+      <div className="w-full max-w-7xl grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-16 z-10">
         
-        <div className="flex items-center justify-center mt-8 gap-6">
-          <div className="h-[1px] w-20 bg-gradient-to-r from-transparent to-zinc-800"></div>
-          <span className="text-[10px] font-black tracking-[0.4em] text-zinc-600 uppercase">Competitive Gaming</span>
-          <div className="h-[1px] w-20 bg-gradient-to-l from-transparent to-zinc-800"></div>
-        </div>
-      </div>
+        {/* PvP Mode */}
+        <ModeCard 
+          title="PvP Duel" 
+          desc="1v1 Ranked" 
+          icon={<Swords size={32} />} 
+          color="cyan" 
+          theme={theme} 
+          onClick={onStartPvP} 
+        />
 
-      {/* --- Game Modes Row --- */}
-      <div className="w-full max-w-7xl grid grid-cols-1 md:grid-cols-3 gap-8 mb-24">
-        
-        {/* PvP Mode - Blue Theme */}
-        <button 
-          onClick={onStartPvP}
-          className="relative group h-[400px] transition-all duration-500 active:scale-95"
-        >
-          <div className="absolute -inset-1 bg-cyan-500/10 rounded-[40px] blur-2xl group-hover:bg-cyan-500/20 transition duration-500"></div>
-          <div className="h-full relative bg-[#0d0d0d] border border-white/5 group-hover:border-cyan-500/40 rounded-[35px] flex flex-col items-center justify-center p-8 transition-all duration-500 overflow-hidden">
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-cyan-500 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
-            <div className="text-7xl mb-6 transform group-hover:scale-110 group-hover:-rotate-12 transition-transform duration-500">⚔️</div>
-            <h2 className="text-4xl font-black tracking-tighter uppercase mb-2 italic">P v P</h2>
-            <p className="text-zinc-500 text-sm mb-8 text-center px-4 leading-relaxed">Battle 1v1 against elite players worldwide</p>
-            <div className="px-6 py-2 rounded-full border border-white/5 bg-white/5 text-[10px] font-black tracking-widest text-cyan-400 uppercase">play game</div>
-          </div>
-        </button>
+        {/* Local Mode */}
+        <ModeCard 
+          title="Local" 
+          desc="Same Device" 
+          icon={<Target size={32} />} 
+          color="emerald" 
+          theme={theme} 
+          onClick={onStartSolo} 
+        />
 
-        {/* Offline Mode - Emerald Theme */}
-        <button 
-          onClick={onStartSolo}
-          className="relative group h-[400px] transition-all duration-500 active:scale-95"
-        >
-          <div className="absolute -inset-1 bg-emerald-500/10 rounded-[40px] blur-2xl group-hover:bg-emerald-500/20 transition duration-500"></div>
-          <div className="h-full relative bg-[#0d0d0d] border border-white/5 group-hover:border-emerald-500/40 rounded-[35px] flex flex-col items-center justify-center p-8 transition-all duration-500 overflow-hidden">
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-emerald-500 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
-            <div className="text-7xl mb-6 transform group-hover:scale-110 transition-transform duration-500">🎯</div>
-            <h2 className="text-3xl font-black tracking-tighter uppercase mb-2 italic">Local Player</h2>
-            <p className="text-zinc-500 text-sm mb-8 text-center px-4 leading-relaxed">Challenge a friend on a single device</p>
-            <div className="px-6 py-2 rounded-full border border-white/5 bg-white/5 text-[10px] font-black tracking-widest text-emerald-400 uppercase">play game</div>
-          </div>
-        </button>
-
-        {/* Online Multi Mode - Purple Theme */}
-        <button 
+        {/* Global Mode */}
+        <ModeCard 
+          title="Lobby" 
+          desc="Global Party" 
+          icon={<Globe size={32} />} 
+          color="purple" 
+          theme={theme} 
           onClick={onStartMultiple} 
-          className="relative group h-[400px] transition-all duration-500 active:scale-95"
-        >
-          <div className="absolute -inset-1 bg-purple-500/10 rounded-[40px] blur-2xl group-hover:bg-purple-500/20 transition duration-500"></div>
-          <div className="h-full relative bg-[#0d0d0d] border border-white/5 group-hover:border-purple-500/40 rounded-[35px] flex flex-col items-center justify-center p-8 transition-all duration-500 overflow-hidden">
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-purple-500 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
-            <div className="text-7xl mb-6 transform group-hover:scale-110 group-hover:rotate-12 transition-transform duration-500">🌐</div>
-            <h2 className="text-3xl font-black tracking-tighter uppercase mb-2 italic">Global Lobby</h2>
-            <p className="text-zinc-500 text-sm mb-8 text-center px-4 leading-relaxed">Multiplayer chaos with up to 4 friends</p>
-            <div className="px-6 py-2 rounded-full border border-white/5 bg-white/5 text-[10px] font-black tracking-widest text-purple-400 uppercase">Join Party</div>
-          </div>
-        </button>
+        />
+
+        {/* NEW: Daily Challenge Mode */}
+        <ModeCard 
+          title=" host question" 
+          desc="kuch bhi" 
+          icon={<Crown size={32} />} 
+          color="orange" 
+          theme={theme} 
+          onClick={onStartMultipl} 
+        />
 
       </div>
 
-      {/* --- Footer Stats Section --- */}
-      <div className="grid grid-cols-3 gap-8 w-full max-w-4xl">
-        <div className="relative group overflow-hidden bg-[#0d0d0d] border border-white/5 rounded-[30px] py-10 text-center transition-all hover:bg-zinc-900/50">
-           <div className="absolute inset-0 bg-gradient-to-b from-emerald-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
-           <span className="relative block text-5xl font-black text-white tracking-tighter">100+</span>
-           <span className="relative text-[10px] text-zinc-600 font-bold uppercase tracking-[0.3em] mt-3 block">Curated Questions</span>
-        </div>
-        
-        <div className="relative group overflow-hidden bg-[#0d0d0d] border border-white/5 rounded-[30px] py-10 text-center transition-all hover:bg-zinc-900/50">
-           <div className="absolute inset-0 bg-gradient-to-b from-cyan-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
-           <span className="relative block text-4xl font-black text-zinc-300 tracking-tighter uppercase italic">Live</span>
-           <span className="relative text-[10px] text-zinc-600 font-bold uppercase tracking-[0.3em] mt-3 block">Real-time Sync</span>
-        </div>
-
-        <div className="relative group overflow-hidden bg-[#0d0d0d] border border-white/5 rounded-[30px] py-10 text-center transition-all hover:bg-zinc-900/50">
-           <div className="absolute inset-0 bg-gradient-to-b from-purple-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
-           <span className="relative block text-4xl font-black text-zinc-300 tracking-tighter uppercase italic text-zinc-600 group-hover:text-white transition-colors">Instant</span>
-           <span className="relative text-[10px] text-zinc-600 font-bold uppercase tracking-[0.3em] mt-3 block">Leaderboards</span>
-        </div>
-      </div>
-
+      {/* --- Minimal Stats Footer --- */}
+  
     </div>
   );
 };
+
+// --- Sub-Component: Stylish Mode Card ---
+const ModeCard = ({ title, desc, icon, color, theme, onClick }) => {
+  const colorMap = {
+    cyan: 'text-cyan-400 border-cyan-500/20 group-hover:border-cyan-500/60 shadow-cyan-500/5',
+    emerald: 'text-emerald-400 border-emerald-500/20 group-hover:border-emerald-500/60 shadow-emerald-500/5',
+    purple: 'text-purple-400 border-purple-500/20 group-hover:border-purple-500/60 shadow-purple-500/5',
+    orange: 'text-orange-400 border-orange-500/20 group-hover:border-orange-500/60 shadow-orange-500/5',
+  };
+
+  return (
+    <motion.div 
+      whileHover={{ y: -8 }}
+      whileTap={{ scale: 0.96 }}
+      onClick={onClick}
+      className={`relative group cursor-pointer ${theme.cardBg} border ${theme.border} ${colorMap[color].split(' ')[1]} rounded-[30px] p-6 transition-all duration-300 shadow-xl overflow-hidden`}
+    >
+      <div className={`absolute -right-4 -bottom-4 w-24 h-24 bg-current opacity-[0.03] rounded-full group-hover:scale-150 transition-transform duration-700 ${colorMap[color].split(' ')[0]}`}></div>
+      
+      <div className={`mb-4 p-3 w-fit rounded-2xl bg-white/5 border border-white/5 ${colorMap[color].split(' ')[0]}`}>
+        {icon}
+      </div>
+
+      <h3 className="text-2xl font-black italic uppercase tracking-tighter mb-1">{title}</h3>
+      <p className={`${theme.textSub} text-xs font-medium mb-6`}>{desc}</p>
+
+      <div className={`inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-widest ${colorMap[color].split(' ')[0]}`}>
+        Enter in game <Zap size={10} />
+      </div>
+    </motion.div>
+  );
+};
+
+const StatTab = ({ icon, val, label, theme }) => (
+  <div className={`${theme.cardBg} border ${theme.border} px-6 py-3 rounded-2xl flex items-center gap-3`}>
+    <div className="text-emerald-500">{icon}</div>
+    <div className="flex flex-col">
+      <span className="text-sm font-black leading-none">{val}</span>
+      <span className={`text-[8px] uppercase tracking-widest font-bold opacity-50`}>{label}</span>
+    </div>
+  </div>
+);
 
 export default StartScreen;
